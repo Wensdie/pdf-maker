@@ -1,7 +1,6 @@
 node_modules
 .vs
 .env
-screenshot/
 
 # Logs
 logs
