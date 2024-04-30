@@ -1,25 +1,100 @@
-import puppeteer from "puppeteer";
-import dotenv from 'dotenv';
+import * as puppeteer from 'puppeteer';
+import * as dotenv from 'dotenv';
+import {setTimeout} from "node:timers/promises"
+import PDFDocument from 'pdfkit';
+import fs from "fs";
 
 dotenv.config();
+Pdf_maker();
 
-const browser = await puppeteer.launch({
-  headless: false,
-  defaultViewport: null,
-});
+async function Pdf_maker() {
+  const browser = await puppeteer.launch({
+    headless: false,
+    defaultViewport: null,
+  });
+  try{
+    const page = await browser.newPage();
+    await page.goto('https://www.ibuk.pl/logowanie.html', {
+      waitUntil: 'networkidle0' 
+    });
 
-const page = await browser.newPage();
-await page.goto('https://www.google.pl', {
-  waitUntil: 'domcontentloaded' 
-});
+    await page.waitForSelector(">>> span#cmpwelcomebtnyes");
+    await page.click(">>> span#cmpwelcomebtnyes");
 
-const emailInput = await page.waitForSelector("#loginform-username");
-const passInput = await page.waitForSelector("#loginform-password");
+    await page.waitForSelector(".close.abo__close");
+    await page.click(".close.abo__close");
+    
+    await page.waitForSelector("#loginform-username");
+    await page.waitForSelector("#loginform-password");
 
-await page.focus(emailInput);
-page.keyboard.type(process.env.PDF_EMAIL, {delay: 100});
+    await page.focus("#loginform-username");
+    page.keyboard.type(process.env["PDF_EMAIL"]!, {delay: 100}).then(async () => {
+      await page.focus("#loginform-password");
+      page.keyboard.type(process.env["PDF_PASSWORD"]!, {delay: 100}); 
+    }) 
 
-await page.focus(passInput);
-page.keyboard.type(process.env.PDF_PASSWORD, {delay: 100});  
+    await setTimeout(4000);
 
-await browser.close();
+    await page.waitForSelector("#customer_login > div.clearfix > button");
+    await page.click("#customer_login > div.clearfix > button");
+
+    await page.waitForSelector("a[title='Moje konto']");
+    await page.click("a[title='Moje konto']");
+
+    await page.waitForSelector(".small-button.small-button--dark-red.account__button");
+    const href = await page.evaluate(
+      () => {
+        let href_Atr
+        try{
+          href_Atr = document.querySelector(".small-button.small-button--dark-red.account__button")?.getAttribute("href");
+        }
+        catch(er){
+          console.log(er);
+        }
+        finally{
+          return href_Atr;
+        }
+    });
+
+    await page.goto("https://www.ibuk.pl" + href);
+
+    await page.waitForSelector("#message-button-0");
+    await page.click("#message-button-0");
+
+    let pdf = new PDFDocument({
+      autoFirstPage: false,
+      size: [611, 876]
+    });
+    pdf.pipe(fs.createWriteStream("Analiza matematyczna w zadaniach. Część 2.pdf"));
+    
+
+    for(let i = 1; i <= 3; i++){
+      await setTimeout(2000);
+      await page.waitForSelector(`#page${i}`);
+      let screenshot_Page = await page.waitForSelector(`#page${i}`);
+      
+      screenshot_Page?.screenshot({
+      path: `screenshot/img_${i}.jpg`
+      });
+
+      await setTimeout(2000);
+      await page.waitForSelector("#nextPageImg");
+      await page.click("#nextPageImg");
+
+      pdf.addPage();
+
+      pdf.image(`./screenshot/img_${i}.jpg`, 0, 0, {
+        align: 'center',
+        valign: 'center'
+      });
+    }
+    pdf.end();
+  }
+  catch(er){
+    console.log(er);
+  }
+  finally{
+    console.log("PDF successfully generated.")
+    await browser.close();
+  }
+}
