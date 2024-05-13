@@ -8,6 +8,13 @@ dotenv.config();
 Pdf_maker();
 
 async function Pdf_maker() {
+  const PDF_PASSWORD = process.env["PDF_PASSWORD"];
+  const PDF_EMAIL = process.env["PDF_EMAIL"]
+
+  if(!PDF_PASSWORD || !PDF_EMAIL){
+    throw new Error("Cannot access email or password.")
+  }
+
   const browser = await puppeteer.launch({
     headless: false,
     defaultViewport: null,
@@ -28,9 +35,9 @@ async function Pdf_maker() {
     await page.waitForSelector("#loginform-password");
 
     await page.focus("#loginform-username");
-    page.keyboard.type(process.env["PDF_EMAIL"]!, {delay: 100}).then(async () => {
+    page.keyboard.type(PDF_EMAIL, {delay: 100}).then(async () => {
       await page.focus("#loginform-password");
-      page.keyboard.type(process.env["PDF_PASSWORD"]!, {delay: 100}); 
+      page.keyboard.type(PDF_PASSWORD, {delay: 100}); 
     }) 
 
     await setTimeout(4000);
@@ -44,15 +51,12 @@ async function Pdf_maker() {
     await page.waitForSelector(".small-button.small-button--dark-red.account__button");
     const href = await page.evaluate(
       () => {
-        let href_Atr
         try{
-          href_Atr = document.querySelector(".small-button.small-button--dark-red.account__button")?.getAttribute("href");
+          const href_Atr = document.querySelector(".small-button.small-button--dark-red.account__button")?.getAttribute("href");
+          return href_Atr;
         }
         catch(er){
           console.log(er);
-        }
-        finally{
-          return href_Atr;
         }
     });
 
@@ -61,14 +65,14 @@ async function Pdf_maker() {
     await page.waitForSelector("#message-button-0");
     await page.click("#message-button-0");
 
-    let pdf = new PDFDocument({
+    const pdf = new PDFDocument({
       autoFirstPage: false,
       size: [611, 876]
     });
     pdf.pipe(fs.createWriteStream("Analiza matematyczna w zadaniach. Część 2.pdf"));
     
 
-    for(let i = 1; i <= 3; i++){
+    for(let i = 1; i <= 493; i++){
       await setTimeout(2000);
       await page.waitForSelector(`#page${i}`);
       let screenshot_Page = await page.waitForSelector(`#page${i}`);
